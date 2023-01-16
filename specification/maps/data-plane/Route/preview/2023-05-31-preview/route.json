@@ -2,7 +2,7 @@
   "swagger": "2.0",
   "info": {
     "title": "Azure Maps Route Service",
-    "version": "2023-03-01-preview",
+    "version": "2023-05-31-preview",
     "description": "Azure Maps Route REST APIs"
   },
   "host": "atlas.microsoft.com",
@@ -57,7 +57,7 @@
       "type": "string",
       "in": "query",
       "required": true,
-      "default": "2023-03-01-preview",
+      "default": "2023-05-31-preview",
       "x-ms-parameter-location": "client"
     },
     "Accept-Language": {
@@ -89,7 +89,7 @@
       }
     },
     "BatchId": {
-      "name": "format",
+      "name": "batchId",
       "x-ms-client-name": "batchId",
       "description": "Batch id for querying the operation.",
       "type": "string",
@@ -102,11 +102,11 @@
     "/route/calculation": {
       "post": {
         "description": "**Applies to**: see pricing [tiers](https://aka.ms/AzureMapsPricingTier).\n\n\nReturns a route between an origin and a destination, passing through waypoints if they are specified. The route will take into account factors such as current traffic and the typical road speeds on the requested day of the week and time of day.\n\nInformation returned includes the distance, estimated travel time, and a representation of the route geometry. Additional routing information such as optimized waypoint order or turn by turn instructions is also available, depending on the options selected.\n\n",
-        "operationId": "Route_GetRouteCalculation",
-        "x-ms-client-name": "GetRouteCalculation",
+        "operationId": "Route_CalculateRoute",
+        "x-ms-client-name": "CalculateRoute",
         "x-ms-examples": {
           "Successfully retrieve a route between an origin and a destination with additional parameters in the body": {
-            "$ref": "./examples/GetRouteCalculation.json"
+            "$ref": "./examples/CalculateRoute.json"
           }
         },
         "parameters": [
@@ -140,64 +140,17 @@
       }
     },
     "/route/calculation:batch": {
-      "post": {
-        "description": "**Route Directions Batch API**\n\n\n**Applies to**: see pricing [tiers](https://aka.ms/AzureMapsPricingTier).\n\n\n\nThe Route Directions Batch API sends batches of queries to [Route Directions API](https://docs.microsoft.com/rest/api/maps/route/getroutedirections) using just a single API call. You can call Route Directions Batch API to run either asynchronously (async) or synchronously (sync). The async API allows caller to batch up to **700** queries and sync API up to **100** queries.\n### Submit Asynchronous Batch Request\nThe Asynchronous API is appropriate for processing big volumes of relatively complex route requests\n- It allows the retrieval of results in a separate call (multiple downloads are possible).\n- The asynchronous API is optimized for reliability and is not expected to run into a timeout.\n- The number of batch items is limited to **700** for this API.\n\nWhen you make a request by using async request, by default the service returns a 202 response code along a redirect URL in the Location field of the response header. This URL should be checked periodically until the response data or error information is available.\nThe asynchronous responses are stored for **14** days. The redirect URL returns a 404 response if used after the expiration period.\n\nPlease note that asynchronous batch request is a long-running request. Here's a typical sequence of operations:\n1. Client sends a Route Directions Batch `POST` request to Azure Maps\n2. The server will respond with one of the following:\n\n    > HTTP `202 Accepted` - Batch request has been accepted.\n\n    > HTTP `Error` - There was an error processing your Batch request. This could either be a `400 Bad Request` or any other `Error` status code.\n\n3. If the batch request was accepted successfully, the `Location` header in the response contains the URL to download the results of the batch request.\n    This status URI looks like following:\n\n``` GET https://atlas.microsoft.com/route/calculation/batch/{batch-id}?api-version=1.0 ```\nNote:- Please remember to add AUTH information (subscription-key/azure_auth - See [Security](#security)) to the _status URI_ before running it. <br>\n4. Client issues a `GET` request on the _download URL_ obtained in Step 3 to download the batch results.\n\n### POST Body for Batch Request\nTo send the _route directions_ queries you will use a `POST` request where the request body will contain the `batchItems` array in `json` format and the `Content-Type` header will be set to `application/json`. Here's a sample request body containing 3 _route directions_ queries:\n\n\n```json\n{\n    \"batchItems\": [\n        { \"query\": \"?query=47.620659,-122.348934:47.610101,-122.342015&travelMode=bicycle&optimization=fastestWithoutTraffic\" },\n        { \"query\": \"?query=40.759856,-73.985108:40.771136,-73.973506&travelMode=pedestrian&optimization=shortest\" },\n        { \"query\": \"?query=48.923159,-122.557362:32.621279,-116.840362\" }\n    ]\n}\n```\n\nA _route directions_ query in a batch is just a partial URL _without_ the protocol, base URL, path, api-version and subscription-key. It can accept any of the supported _route directions_ [URI parameters](https://docs.microsoft.com/rest/api/maps/route/getroutedirections#uri-parameters). The string values in the _route directions_ query must be properly escaped (e.g. \" character should be escaped with \\\\ ) and it should also be properly URL-encoded.\n\n\nThe async API allows caller to batch up to **700** queries and sync API up to **100** queries, and the batch should contain at least **1** query.\n\n\n### Download Asynchronous Batch Results\nTo download the async batch results you will issue a `GET` request to the batch download endpoint. This _download URL_ can be obtained from the `Location` header of a successful `POST` batch request and looks like the following:\n\n```\nhttps://atlas.microsoft.com/route/calculation/batch/{batch-id}?api-version=1.0&subscription-key={subscription-key}\n```\nHere's the typical sequence of operations for downloading the batch results:\n1. Client sends a `GET` request using the _download URL_.\n2. The server will respond with one of the following:\n    \n    > HTTP `202 Accepted` - Batch request was accepted but is still being processed. Please try again in some time.\n\n    > HTTP `200 OK` - Batch request successfully processed. The response body contains all the batch results.\n\n\n\n### Batch Response Model\nThe returned data content is similar for async and sync requests. When downloading the results of an async batch request, if the batch has finished processing, the response body contains the batch response. This batch response contains a `summary` component that indicates the `totalRequests` that were part of the original batch request and `successfulRequests`i.e. queries which were executed successfully. The batch response also includes a `batchItems` array which contains a response for each and every query in the batch request. The `batchItems` will contain the results in the exact same order the original queries were sent in the batch request. Each item in `batchItems` contains `statusCode` and `response` fields. Each `response` in `batchItems` is of one of the following types:\n\n  - [`CalculateRouteResponse`](https://docs.microsoft.com/rest/api/maps/route/getroutedirections#routedirections) - If the query completed successfully.\n\n  - `Error` - If the query failed. The response will contain a `code` and a `message` in this case.\n\n\nHere's a sample Batch Response with 1 _successful_ and 1 _failed_ result:\n\n\n```json\n{\n    \"summary\": {\n        \"successfulRequests\": 1,\n        \"totalRequests\": 2\n    },\n    \"batchItems\": [\n        {\n            \"statusCode\": 200,\n            \"response\": {\n                \"routes\": [\n                    {\n                        \"summary\": {\n                            \"lengthInMeters\": 1758,\n                            \"travelTimeInSeconds\": 387,\n                            \"trafficDelayInSeconds\": 0,\n                            \"departureTime\": \"2018-07-17T00:49:56+00:00\",\n                            \"arrivalTime\": \"2018-07-17T00:56:22+00:00\"\n                        },\n                        \"legs\": [\n                            {\n                                \"summary\": {\n                                    \"lengthInMeters\": 1758,\n                                    \"travelTimeInSeconds\": 387,\n                                    \"trafficDelayInSeconds\": 0,\n                                    \"departureTime\": \"2018-07-17T00:49:56+00:00\",\n                                    \"arrivalTime\": \"2018-07-17T00:56:22+00:00\"\n                                },\n                                \"points\": [\n                                    {\n                                        \"latitude\": 47.62094,\n                                        \"longitude\": -122.34892\n                                    },\n                                    {\n                                        \"latitude\": 47.62094,\n                                        \"longitude\": -122.3485\n                                    },\n                                    {\n                                        \"latitude\": 47.62095,\n                                        \"longitude\": -122.3476\n                                    }\n                                ]\n                            }\n                        ],\n                        \"sections\": [\n                            {\n                                \"startPointIndex\": 0,\n                                \"endPointIndex\": 40,\n                                \"sectionType\": \"TRAVEL_MODE\",\n                                \"travelMode\": \"bicycle\"\n                            }\n                        ]\n                    }\n                ]\n            }\n        },\n        {\n            \"statusCode\": 400,\n            \"response\":\n            {\n                \"error\":\n                {\n                    \"code\": \"400 BadRequest\",\n                    \"message\": \"Bad request: one or more parameters were incorrectly specified or are mutually exclusive.\"\n                }\n            }\n        }\n    ]\n}\n```",
-        "operationId": "Route_PostCalculateRouteResponseBatch",
-        "x-ms-client-name": "RequestCalculateRouteResponseBatch",
-        "x-ms-long-running-operation": true,
-        "x-ms-long-running-operation-options": {
-          "final-state-via": "location"
-        },
-        "x-ms-examples": {
-          "Successfully submit a route direction batch request": {
-            "$ref": "./examples/PostCalculateRouteResponseBatch.json"
-          }
-        },
-        "parameters": [
-          {
-            "$ref": "../../../Common/preview/1.0/common.json#/parameters/ClientId"
-          },
-          {
-            "$ref": "#/parameters/ApiVersion"
-          },
-          {
-            "$ref": "../../../Common/preview/1.0/common.json#/parameters/JsonFormat"
-          },
-          {
-            "name": "routeDirectionsBatchQueries",
-            "in": "body",
-            "description": "The list of route directions queries/requests to process. The list can contain a max of 700 queries for async and 100 queries for sync version and must contain at least 1 query.",
-            "required": true,
-            "schema": {
-              "$ref": "../../../Common/preview/1.0/common.json#/definitions/BatchRequest"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Batch request successfully processed. The response body contains all the batch results.",
-            "schema": {
-              "$ref": "#/definitions/CalculateRouteBatchResponseResult"
-            }
-          },
-          "202": {
-            "$ref": "../../../Common/preview/1.0/common.json#/responses/202Async"
-          },
-          "default": {
-            "$ref": "../../../Common/preview/1.0/common.json#/responses/default"
-          }
-        }
-      },
       "get": {
         "description": "**Applies to**: see pricing [tiers](https://aka.ms/AzureMapsPricingTier).\n\n### Download Asynchronous Batch Results\nTo download the async batch results you will issue a `GET` request to the batch download endpoint. This _download URL_ can be obtained from the `Location` header of a successful `POST` batch request and looks like the following:\n\n```\nhttps://atlas.microsoft.com/route/calculation/batch/{batch-id}?api-version=1.0&subscription-key={subscription-key}\n```\nHere's the typical sequence of operations for downloading the batch results:\n1. Client sends a `GET` request using the _download URL_.\n2. The server will respond with one of the following:\n    \n    > HTTP `202 Accepted` - Batch request was accepted but is still being processed. Please try again in some time.\n\n    > HTTP `200 OK` - Batch request successfully processed. The response body contains all the batch results.\n\n\n\n### Batch Response Model\nThe returned data content is similar for async and sync requests. When downloading the results of an async batch request, if the batch has finished processing, the response body contains the batch response. This batch response contains a `summary` component that indicates the `totalRequests` that were part of the original batch request and `successfulRequests`i.e. queries which were executed successfully. The batch response also includes a `batchItems` array which contains a response for each and every query in the batch request. The `batchItems` will contain the results in the exact same order the original queries were sent in the batch request. Each item in `batchItems` contains `statusCode` and `response` fields. Each `response` in `batchItems` is of one of the following types:\n\n  - [`CalculateRouteResponse`](https://docs.microsoft.com/rest/api/maps/route/getroutedirections#routedirections) - If the query completed successfully.\n\n  - `Error` - If the query failed. The response will contain a `code` and a `message` in this case.\n\n\nHere's a sample Batch Response with 1 _successful_ and 1 _failed_ result:\n\n\n```json\n{\n    \"summary\": {\n        \"successfulRequests\": 1,\n        \"totalRequests\": 2\n    },\n    \"batchItems\": [\n        {\n            \"statusCode\": 200,\n            \"response\": {\n                \"routes\": [\n                    {\n                        \"summary\": {\n                            \"lengthInMeters\": 1758,\n                            \"travelTimeInSeconds\": 387,\n                            \"trafficDelayInSeconds\": 0,\n                            \"departureTime\": \"2018-07-17T00:49:56+00:00\",\n                            \"arrivalTime\": \"2018-07-17T00:56:22+00:00\"\n                        },\n                        \"legs\": [\n                            {\n                                \"summary\": {\n                                    \"lengthInMeters\": 1758,\n                                    \"travelTimeInSeconds\": 387,\n                                    \"trafficDelayInSeconds\": 0,\n                                    \"departureTime\": \"2018-07-17T00:49:56+00:00\",\n                                    \"arrivalTime\": \"2018-07-17T00:56:22+00:00\"\n                                },\n                                \"points\": [\n                                    {\n                                        \"latitude\": 47.62094,\n                                        \"longitude\": -122.34892\n                                    },\n                                    {\n                                        \"latitude\": 47.62094,\n                                        \"longitude\": -122.3485\n                                    },\n                                    {\n                                        \"latitude\": 47.62095,\n                                        \"longitude\": -122.3476\n                                    }\n                                ]\n                            }\n                        ],\n                        \"sections\": [\n                            {\n                                \"startPointIndex\": 0,\n                                \"endPointIndex\": 40,\n                                \"sectionType\": \"TRAVEL_MODE\",\n                                \"travelMode\": \"bicycle\"\n                            }\n                        ]\n                    }\n                ]\n            }\n        },\n        {\n            \"statusCode\": 400,\n            \"response\":\n            {\n                \"error\":\n                {\n                    \"code\": \"400 BadRequest\",\n                    \"message\": \"Bad request: one or more parameters were incorrectly specified or are mutually exclusive.\"\n                }\n            }\n        }\n    ]\n}\n```",
-        "operationId": "Route_GetCalculateRouteResponseBatch",
+        "operationId": "Route_CalculateRouteBatch",
         "x-ms-long-running-operation": true,
         "x-ms-long-running-operation-options": {
           "final-state-via": "original-uri"
         },
+        "x-ms-client-name": "CalculateRouteBatch",
         "x-ms-examples": {
-          "Successfully retrieve the status for the route direction batch request": {
-            "$ref": "./examples/GetCalculateRouteResponseBatch.json"
+          "Successfully retrieve the status for the route calculation batch request": {
+            "$ref": "./examples/CalculateRouteBatch.json"
           }
         },
         "parameters": [
@@ -215,54 +168,11 @@
           "200": {
             "description": "Batch request successfully processed. The response body contains all the batch results.",
             "schema": {
-              "$ref": "#/definitions/CalculateRouteBatchResponseResult"
+              "$ref": "#/definitions/CalculateRouteBatchResponse"
             }
           },
           "202": {
             "$ref": "../../../Common/preview/1.0/common.json#/responses/202Async"
-          },
-          "default": {
-            "$ref": "../../../Common/preview/1.0/common.json#/responses/default"
-          }
-        }
-      }
-    },
-    "/route/calculation/batch/sync/{format}": {
-      "post": {
-        "description": "**Route Directions Batch API**\n\n\n**Applies to**: see pricing [tiers](https://aka.ms/AzureMapsPricingTier).\n\n\n\nThe Route Directions Batch API sends batches of queries to [Route Directions API](https://docs.microsoft.com/rest/api/maps/route/getroutedirections) using just a single API call. You can call Route Directions Batch API to run either asynchronously (async) or synchronously (sync). The async API allows caller to batch up to **700** queries and sync API up to **100** queries.\n### Submit Synchronous Batch Request\nThe Synchronous API is recommended for lightweight batch requests. When the service receives a request, it will respond as soon as the batch items are calculated and there will be no possibility to retrieve the results later. The Synchronous API will return a timeout error (a 408 response) if the request takes longer than 60 seconds. The number of batch items is limited to **100** for this API.\n```\nPOST https://atlas.microsoft.com/route/calculation/batch/sync/json?api-version=1.0&subscription-key={subscription-key}\n```\n### Batch Response Model\nThe returned data content is similar for async and sync requests. When downloading the results of an async batch request, if the batch has finished processing, the response body contains the batch response. This batch response contains a `summary` component that indicates the `totalRequests` that were part of the original batch request and `successfulRequests`i.e. queries which were executed successfully. The batch response also includes a `batchItems` array which contains a response for each and every query in the batch request. The `batchItems` will contain the results in the exact same order the original queries were sent in the batch request. Each item in `batchItems` contains `statusCode` and `response` fields. Each `response` in `batchItems` is of one of the following types:\n\n  - [`CalculateRouteResponse`](https://docs.microsoft.com/rest/api/maps/route/getroutedirections#routedirections) - If the query completed successfully.\n\n  - `Error` - If the query failed. The response will contain a `code` and a `message` in this case.\n\n\nHere's a sample Batch Response with 1 _successful_ and 1 _failed_ result:\n\n\n```json\n{\n    \"summary\": {\n        \"successfulRequests\": 1,\n        \"totalRequests\": 2\n    },\n    \"batchItems\": [\n        {\n            \"statusCode\": 200,\n            \"response\": {\n                \"routes\": [\n                    {\n                        \"summary\": {\n                            \"lengthInMeters\": 1758,\n                            \"travelTimeInSeconds\": 387,\n                            \"trafficDelayInSeconds\": 0,\n                            \"departureTime\": \"2018-07-17T00:49:56+00:00\",\n                            \"arrivalTime\": \"2018-07-17T00:56:22+00:00\"\n                        },\n                        \"legs\": [\n                            {\n                                \"summary\": {\n                                    \"lengthInMeters\": 1758,\n                                    \"travelTimeInSeconds\": 387,\n                                    \"trafficDelayInSeconds\": 0,\n                                    \"departureTime\": \"2018-07-17T00:49:56+00:00\",\n                                    \"arrivalTime\": \"2018-07-17T00:56:22+00:00\"\n                                },\n                                \"points\": [\n                                    {\n                                        \"latitude\": 47.62094,\n                                        \"longitude\": -122.34892\n                                    },\n                                    {\n                                        \"latitude\": 47.62094,\n                                        \"longitude\": -122.3485\n                                    },\n                                    {\n                                        \"latitude\": 47.62095,\n                                        \"longitude\": -122.3476\n                                    }\n                                ]\n                            }\n                        ],\n                        \"sections\": [\n                            {\n                                \"startPointIndex\": 0,\n                                \"endPointIndex\": 40,\n                                \"sectionType\": \"TRAVEL_MODE\",\n                                \"travelMode\": \"bicycle\"\n                            }\n                        ]\n                    }\n                ]\n            }\n        },\n        {\n            \"statusCode\": 400,\n            \"response\":\n            {\n                \"error\":\n                {\n                    \"code\": \"400 BadRequest\",\n                    \"message\": \"Bad request: one or more parameters were incorrectly specified or are mutually exclusive.\"\n                }\n            }\n        }\n    ]\n}\n```",
-        "operationId": "Route_PostCalculateRouteResponseBatchSync",
-        "x-ms-client-name": "RequestCalculateRouteResponseBatchSync",
-        "x-ms-examples": {
-          "Successfully retrieve the route direction batch result synchronously": {
-            "$ref": "./examples/PostCalculateRouteResponseBatchSync.json"
-          }
-        },
-        "parameters": [
-          {
-            "$ref": "../../../Common/preview/1.0/common.json#/parameters/ClientId"
-          },
-          {
-            "$ref": "#/parameters/ApiVersion"
-          },
-          {
-            "$ref": "../../../Common/preview/1.0/common.json#/parameters/JsonFormat"
-          },
-          {
-            "name": "routeDirectionsBatchQueries",
-            "in": "body",
-            "description": "The list of route directions queries/requests to process. The list can contain  a max of 700 queries for async and 100 queries for sync version and must contain at least 1 query.",
-            "required": true,
-            "schema": {
-              "$ref": "../../../Common/preview/1.0/common.json#/definitions/BatchRequest"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/CalculateRouteBatchResponseResult"
-            }
           },
           "408": {
             "description": "Timeout: The request took longer to finish than the maximum amount of time defined in the api.",
@@ -282,18 +192,18 @@
     "CalculateRouteRequest": {
       "description": "This object contains parameters to call CalculateRoute",
       "type": "object",
-      "required": ["locations"],
+      "required": ["waypoints"],
       "properties": {
-        "locations": {
+        "waypoints": {
           "description": "The Coordinates through which the route is calculated, delimited by a colon.  A minimum of two coordinates is required.  The first one is the origin and the last is the destination of the route. Optional coordinates in-between act as WayPoints in the route.  You can pass up to 150 WayPoints.",
           "type": "string"
         },
         "travelMode": {
-          "description": "The mode of travel for the requested route. If not defined, default is 'car'. Note that the requested travelMode may not be available for the entire route. Refer to the [list of supported car/walking market](https://learn.microsoft.com/bingmaps/coverage/geographic-coverage) and [list of transit support in different markets](https://learn.microsoft.com/bingmaps/coverage/transit-coverage/).",
+          "description": "The mode of travel for the requested route. If not defined, default is 'driving'. Note that the requested travelMode may not be available for the entire route. Refer to the [list of supported driving/walking market](https://learn.microsoft.com/bingmaps/coverage/geographic-coverage) and [list of transit support in different markets](https://learn.microsoft.com/bingmaps/coverage/transit-coverage/).",
           "type": "string",
-          "default": "car",
+          "default": "driving",
           "enum": [
-            "car",
+            "driving",
             "truck",
             "walking",
             "transit"
@@ -303,12 +213,12 @@
             "modelAsString": true,
             "values": [
               {
-                "value": "car",
-                "description": "The returned routes are optimized for cars."
+                "value": "driving",
+                "description": "The returned routes are optimized for common driving scenarios."
               },
               {
                 "value": "truck",
-                "description": "The returned routes are optimized for commercial vehicles, like for trucks."
+                "description": "The returned routes are optimized for trucks."
               },
               {
                 "value": "walking",
@@ -331,8 +241,8 @@
           "type": "string",
           "format": "date-time"
         },
-        "optimization": {
-          "description": "The type of route optimization.",
+        "optimize": {
+          "description": "Re-order the route waypoints using a fast heuristic algorithm to reduce the route length. Yields best results when used in conjunction with routeType shortest. Notice that origin and destination are excluded from the optimized waypoint indices. True computes a better order if possible, but is not allowed to be used in conjunction with maxAlternatives value greater than 0 or in conjunction with circle waypoints.",
           "type": "string",
           "default": "fastestWithoutTraffic",
           "enum": [
@@ -342,7 +252,7 @@
             "fastestWithTraffic"
           ],
           "x-ms-enum": {
-            "name": "Optimization",
+            "name": "Optimize",
             "modelAsString": true,
             "values": [
               {
@@ -369,12 +279,12 @@
           }
         },
         "optimizeWaypoints": {
-          "description": "Re-order the route waypoints using a fast heuristic algorithm to reduce the route length. Yields best results when used in conjunction with optimization _shortest_. Notice that origin and destination are excluded from the optimized waypoint indices. To include origin and destination in the response, please increase all the indices by 1 to account for the origin, and then add the destination as the final index. Possible values are true or false. True computes a better order if possible, but is not allowed to be used in conjunction with maxAlternatives value greater than 0 or in conjunction with circle waypoints. False will use the locations in the given order and not allowed to be used in conjunction with routeRepresentation _none_.",
+          "description": "Re-order the route waypoints using a fast heuristic algorithm to reduce the route length. Yields best results when used in conjunction with optimize _shortest_. Notice that origin and destination are excluded from the optimized waypoint indices. To include origin and destination in the response, please increase all the indices by 1 to account for the origin, and then add the destination as the final index. Possible values are true or false. True computes a better order if possible, but is not allowed to be used in conjunction with maxAlternatives value greater than 0 or in conjunction with circle waypoints. False will use the waypoints in the given order and not allowed to be used in conjunction with routeRepresentation _none_.",
           "type": "boolean",
           "default": false
         },
         "avoid": {
-          "description": "Specifies something that the route calculation should try to avoid when determining the route. Can be specified multiple items, for example, '\"avoid\": [\"motorways\", \"tollRoads\"]'.",
+          "description": "Specifies something that the route calculation should try to avoid when determining the route. Can be specified multiple items, for example, '\"avoid\": [\"motorways\", \"tollRoads\"]'. Noted that minimizeHighways/minimizeTollRoads/borderCrossing are not supported when travelMode=truck.",
           "type": "array",
           "items": {
             "type": "string",
@@ -464,15 +374,15 @@
             }
           }
         },
-        "vehicleIsCommercial": {
+        "isVehicleCommercial": {
           "description": "Whether the vehicle is used for commercial purposes. Commercial vehicles may not be allowed to drive on some roads.",
           "type": "boolean",
           "default": false
         },
-        "maxAlternatives": {
-          "description": "Number of desired alternative routes to be calculated. Default: 0, minimum: 0 and maximum: 3",
+        "maxSolutions": {
+          "description": "Number of maximal routes to be calculated. Default: 1, minimum: 1 and maximum: 3",
           "type": "integer",
-          "minimum": 0,
+          "minimum": 1,
           "maximum": 3
         },
         "itineraryGroups": {
@@ -1308,7 +1218,7 @@
         }
       }
     },
-    "CalculateRouteBatchResponseResult": {
+    "CalculateRouteBatchResponse": {
       "description": "This object is returned from a successful Route Directions Batch service call.",
       "type": "object",
       "allOf": [
@@ -1453,7 +1363,7 @@
       "type": "string",
       "readOnly": true,
       "enum": [
-        "car",
+        "driving",
         "truck",
         "walking",
         "transit"
@@ -1463,12 +1373,12 @@
         "modelAsString": true,
         "values": [
           {
-            "value": "car",
-            "description": "The returned routes are optimized for cars."
+            "value": "driving",
+            "description": "The returned routes are optimized for common driving scenarios."
           },
           {
             "value": "truck",
-            "description": "The returned routes are optimized for commercial vehicles, like for trucks."
+            "description": "The returned routes are optimized for trucks."
           },
           {
             "value": "walking",
