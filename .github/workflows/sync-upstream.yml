@@ -1,0 +1,25 @@
+name: Sync Fork with Upstream
+
+on:
+  schedule:
+    # Runs daily at 00:00 UTC
+    - cron: "0 0 * * *"
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync with upstream
+        run: |
+          git remote add upstream https://github.com/Azure/azure-rest-api-specs.git || true
+          git fetch upstream main
+          git checkout main
+          git rebase upstream/main
+          git push origin main --force-with-lease
